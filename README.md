@@ -107,7 +107,8 @@ playify/
 - **Export Options** - Export to other music platforms
 - **Smart Recommendations** - AI-powered playlist suggestions
 - **Advanced Filters** - Decade, popularity, explicit content filters
+- **Preview songs and lyrics**
 
-## 🎵 Enjoy Your Custom Playlists!
+## Enjoy Your Custom Playlists!
 
 Start creating amazing playlists tailored to your exact mood and preferences!
