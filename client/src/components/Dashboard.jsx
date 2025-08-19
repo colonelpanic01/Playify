@@ -4,7 +4,7 @@ import PlaylistGenerator from "../pages/PlaylistGenerator";
 function Dashboard({ user, accessToken }) {
   const [likedSongs, setLikedSongs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 });
+  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0, songsLoaded: 0 });
 
   useEffect(() => {
     fetchLikedSongs();
@@ -13,7 +13,7 @@ function Dashboard({ user, accessToken }) {
   const fetchLikedSongs = async () => {
     try {
       setLoading(true);
-      setLoadingProgress({ current: 0, total: 0 });
+      setLoadingProgress({ current: 0, total: 0, songsLoaded: 0 });
       
       // First, get the total count
       const initialResponse = await fetch('https://api.spotify.com/v1/me/tracks?limit=1', {
@@ -29,7 +29,7 @@ function Dashboard({ user, accessToken }) {
       // Calculate how many requests we need (50 is max per request)
       const limit = 50;
       const totalRequests = Math.ceil(totalCount / limit);
-      setLoadingProgress({ current: 0, total: totalRequests });
+      setLoadingProgress({ current: 0, total: totalRequests, songsLoaded: 0 });
       
       let allSongs = [];
       let completedRequests = 0;
@@ -53,7 +53,10 @@ function Dashboard({ user, accessToken }) {
             3 // retry up to 3 times
           ).then(data => {
             completedRequests++;
-            setLoadingProgress(prev => ({ ...prev, current: completedRequests }));
+            setLoadingProgress(prev => ({ 
+              ...prev, 
+              current: completedRequests
+            }));
             return data;
           });
           
@@ -63,8 +66,8 @@ function Dashboard({ user, accessToken }) {
         // Wait for current batch to complete
         const batchResponses = await Promise.all(batchPromises);
         
-        // Process batch results
-        batchResponses.forEach(data => {
+        // Process batch results - filter out failed requests
+        batchResponses.forEach((data, index) => {
           if (data && data.items) {
             const songs = data.items.map(item => ({
               id: item.track.id,
@@ -76,8 +79,16 @@ function Dashboard({ user, accessToken }) {
               audio_features: null
             }));
             allSongs = [...allSongs, ...songs];
+          } else {
+            console.warn(`Request failed for batch item ${index}, no data received`);
           }
         });
+        
+        // Update song count after processing batch
+        setLoadingProgress(prev => ({ 
+          ...prev, 
+          songsLoaded: allSongs.length
+        }));
         
         // Small delay between batches to be nice to Spotify's API
         if (batchEnd < totalRequests) {
@@ -86,6 +97,69 @@ function Dashboard({ user, accessToken }) {
       }
       
       console.log(`Successfully loaded ${allSongs.length} songs out of ${totalCount} expected`);
+      
+      if (allSongs.length < totalCount) {
+        console.warn(`Missing ${totalCount - allSongs.length} songs. This might be due to failed requests or rate limiting.`);
+        console.log('Attempting to fetch missing songs with sequential method...');
+        
+        // Try to fetch the missing songs one more time
+        try {
+          const missingCount = totalCount - allSongs.length;
+          const startOffset = allSongs.length;
+          
+          console.log(`Attempting to fetch ${missingCount} missing songs starting from offset ${startOffset}`);
+          
+          const limit = 50;
+          const additionalRequests = Math.ceil(missingCount / limit);
+          
+          for (let i = 0; i < additionalRequests; i++) {
+            const offset = startOffset + (i * limit);
+            try {
+              const response = await fetchWithRetry(
+                `https://api.spotify.com/v1/me/tracks?limit=${limit}&offset=${offset}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                  }
+                },
+                5 // More retries for missing songs
+              );
+              
+              if (response && response.items && response.items.length > 0) {
+                const songs = response.items.map(item => ({
+                  id: item.track.id,
+                  name: item.track.name,
+                  artist: item.track.artists[0].name,
+                  album: item.track.album.name,
+                  added_at: item.added_at,
+                  genres: item.track.artists[0].genres || [],
+                  audio_features: null
+                }));
+                
+                allSongs = [...allSongs, ...songs];
+                console.log(`Fetched ${songs.length} additional songs at offset ${offset}. Total now: ${allSongs.length}`);
+                
+                // Update progress
+                setLoadingProgress(prev => ({ 
+                  ...prev, 
+                  songsLoaded: allSongs.length
+                }));
+              } else {
+                console.log(`No more songs found at offset ${offset}`);
+                break;
+              }
+              
+              // Delay between requests
+              await new Promise(resolve => setTimeout(resolve, 300));
+            } catch (error) {
+              console.error(`Failed to fetch missing songs at offset ${offset}:`, error);
+            }
+          }
+        } catch (error) {
+          console.error('Error during missing songs recovery:', error);
+        }
+      }
+      
       setLikedSongs(allSongs);
     } catch (error) {
       console.error('Error fetching liked songs:', error);
@@ -93,6 +167,47 @@ function Dashboard({ user, accessToken }) {
       await fetchLikedSongsSequential();
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Function to fetch missing songs
+  const fetchMissingSongs = async (startOffset, count) => {
+    try {
+      const limit = 50;
+      const requests = Math.ceil(count / limit);
+      
+      for (let i = 0; i < requests; i++) {
+        const offset = startOffset + (i * limit);
+        const response = await fetchWithRetry(
+          `https://api.spotify.com/v1/me/tracks?limit=${limit}&offset=${offset}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`
+            }
+          },
+          3
+        );
+        
+        if (response && response.items) {
+          const songs = response.items.map(item => ({
+            id: item.track.id,
+            name: item.track.name,
+            artist: item.track.artists[0].name,
+            album: item.track.album.name,
+            added_at: item.added_at,
+            genres: item.track.artists[0].genres || [],
+            audio_features: null
+          }));
+          
+          setLikedSongs(prev => [...prev, ...songs]);
+          console.log(`Fetched ${songs.length} missing songs at offset ${offset}`);
+        }
+        
+        // Small delay between requests
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    } catch (error) {
+      console.error('Error fetching missing songs:', error);
     }
   };
 
@@ -138,7 +253,7 @@ function Dashboard({ user, accessToken }) {
     });
     const initialData = await initialResponse.json();
     const totalRequests = Math.ceil(initialData.total / 50);
-    setLoadingProgress({ current: 0, total: totalRequests });
+    setLoadingProgress({ current: 0, total: totalRequests, songsLoaded: 0 });
     
     while (url) {
       try {
@@ -164,7 +279,12 @@ function Dashboard({ user, accessToken }) {
         }
         
         requestCount++;
-        setLoadingProgress({ current: requestCount, total: totalRequests });
+        const currentSongCount = allSongs.length;
+        setLoadingProgress({ 
+          current: requestCount, 
+          total: totalRequests,
+          songsLoaded: currentSongCount
+        });
         url = data.next;
         
         // Small delay to avoid rate limiting
@@ -207,7 +327,7 @@ function Dashboard({ user, accessToken }) {
                   Using batched requests with retry logic for reliability ⚡
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Songs found: {likedSongs.length}
+                  Songs found: {loadingProgress.songsLoaded}
                 </p>
               </>
             )}

@@ -17,11 +17,51 @@ function PlaylistGenerator({ likedSongs, accessToken }) {
   const [seasonalPreviews, setSeasonalPreviews] = useState([]);
   const [selectedSongs, setSelectedSongs] = useState(new Set());
   const [expandedPreview, setExpandedPreview] = useState(null);
+  const [removedSongs, setRemovedSongs] = useState({
+    monthly: {},
+    seasonal: {},
+    single: new Set()
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
   const handleChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
+  };
+
+  // Toggle functions for song selection
+  const toggleSeasonalSongSelection = (seasonIndex, songId) => {
+    setRemovedSongs(prev => {
+      const newRemoved = { ...prev };
+      if (!newRemoved.seasonal[seasonIndex]) {
+        newRemoved.seasonal[seasonIndex] = new Set();
+      }
+      
+      if (newRemoved.seasonal[seasonIndex].has(songId)) {
+        newRemoved.seasonal[seasonIndex].delete(songId);
+      } else {
+        newRemoved.seasonal[seasonIndex].add(songId);
+      }
+      
+      return newRemoved;
+    });
+  };
+
+  const toggleMonthlySongSelection = (monthIndex, songId) => {
+    setRemovedSongs(prev => {
+      const newRemoved = { ...prev };
+      if (!newRemoved.monthly[monthIndex]) {
+        newRemoved.monthly[monthIndex] = new Set();
+      }
+      
+      if (newRemoved.monthly[monthIndex].has(songId)) {
+        newRemoved.monthly[monthIndex].delete(songId);
+      } else {
+        newRemoved.monthly[monthIndex].add(songId);
+      }
+      
+      return newRemoved;
+    });
   };
 
   const handleGenerate = () => {
@@ -639,22 +679,64 @@ function PlaylistGenerator({ likedSongs, accessToken }) {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {monthlyPreviews.map((monthlyPlaylist, idx) => (
-              <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <h4 className="font-semibold text-gray-800 mb-2">{monthlyPlaylist.title}</h4>
-                <p className="text-sm text-gray-600 mb-3">{monthlyPlaylist.count} songs</p>
-                <div className="max-h-32 overflow-y-auto text-xs">
-                  {monthlyPlaylist.songs.slice(0, 5).map((song, songIdx) => (
-                    <div key={songIdx} className="text-gray-700 truncate">
-                      {song.name} - {song.artist}
+            {monthlyPreviews.map((monthlyPlaylist, monthIndex) => (
+              <div key={monthIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-gray-800">{monthlyPlaylist.title}</h4>
+                  <span className="text-sm text-gray-500">{monthlyPlaylist.count} songs</span>
+                </div>
+                
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {monthlyPlaylist.songs.slice(0, 5).map((song, songIndex) => (
+                    <div key={songIndex} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={!removedSongs.monthly[monthIndex]?.has(song.id)}
+                          onChange={() => toggleMonthlySongSelection(monthIndex, song.id)}
+                          className="w-3 h-3"
+                        />
+                        <span className="truncate max-w-[120px]" title={`${song.name} - ${song.artist}`}>
+                          {song.name} - {song.artist}
+                        </span>
+                      </div>
                     </div>
                   ))}
                   {monthlyPlaylist.songs.length > 5 && (
-                    <div className="text-gray-500 italic">
-                      ...and {monthlyPlaylist.songs.length - 5} more
+                    <div className="text-xs text-gray-400">
+                      ... and {monthlyPlaylist.songs.length - 5} more songs
                     </div>
                   )}
                 </div>
+                
+                <button 
+                  onClick={() => setExpandedPreview(expandedPreview === `monthly-${monthIndex}` ? null : `monthly-${monthIndex}`)}
+                  className="mt-2 text-xs text-blue-600 hover:text-blue-800"
+                >
+                  {expandedPreview === `monthly-${monthIndex}` ? 'Show Less' : 'View All Songs'}
+                </button>
+                
+                {expandedPreview === `monthly-${monthIndex}` && (
+                  <div className="mt-3 border-t pt-3 max-h-60 overflow-y-auto">
+                    <div className="space-y-1">
+                      {monthlyPlaylist.songs.map((song, songIndex) => (
+                        <div key={songIndex} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={!removedSongs.monthly[monthIndex]?.has(song.id)}
+                              onChange={() => toggleMonthlySongSelection(monthIndex, song.id)}
+                              className="w-3 h-3"
+                            />
+                            <span className="truncate" title={`${song.name} - ${song.artist}`}>
+                              {song.name} - {song.artist}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -672,7 +754,7 @@ function PlaylistGenerator({ likedSongs, accessToken }) {
           </div>
           
           <button 
-            onClick={handleAddToSpotify}
+            onClick={createMonthlyPlaylists}
             disabled={isCreating}
             className="bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white px-6 py-2 rounded-md font-medium transition duration-200"
           >
@@ -720,6 +802,35 @@ function PlaylistGenerator({ likedSongs, accessToken }) {
                     </div>
                   )}
                 </div>
+                
+                <button 
+                  onClick={() => setExpandedPreview(expandedPreview === `seasonal-${seasonIndex}` ? null : `seasonal-${seasonIndex}`)}
+                  className="mt-2 text-xs text-blue-600 hover:text-blue-800"
+                >
+                  {expandedPreview === `seasonal-${seasonIndex}` ? 'Show Less' : 'View All Songs'}
+                </button>
+                
+                {expandedPreview === `seasonal-${seasonIndex}` && (
+                  <div className="mt-3 border-t pt-3 max-h-60 overflow-y-auto">
+                    <div className="space-y-1">
+                      {seasonalPlaylist.songs.map((song, songIndex) => (
+                        <div key={songIndex} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={!removedSongs.seasonal[seasonIndex]?.has(song.id)}
+                              onChange={() => toggleSeasonalSongSelection(seasonIndex, song.id)}
+                              className="w-3 h-3"
+                            />
+                            <span className="truncate" title={`${song.name} - ${song.artists.map(a => a.name).join(', ')}`}>
+                              {song.name} - {song.artists.map(a => a.name).join(', ')}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
