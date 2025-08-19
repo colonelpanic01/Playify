@@ -1,6 +1,6 @@
-# Playify 🎵
+# Playify
 
-A modern Spotify playlist generator web app that creates custom playlists from your liked songs using powerful filters. Log in with Spotify, filter by mood, genre, season, date range, and more, then preview and add generated playlists directly to your Spotify account.
+I'd been meaning to index my liked songs in spotify based on different filters and generate playlists from them so here's a thing that does that. Log in with Spotify, filter by mood, genre, season, date range, and more, then preview and add generated playlists directly to your Spotify account.
 
 ## Features
 
