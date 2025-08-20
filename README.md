@@ -4,7 +4,7 @@ I'd been meaning to index my liked songs in spotify based on different filters a
 
 ## Features
 
-- **Spotify Authentication** - Secure OAuth login with Spotify
+- **Spotify Authentication** - OAuth login with Spotify
 - **Smart Filtering** - Filter by:
   - Mood/Vibe (e.g., chill, energetic, sad)
   - Genre/Artist (e.g., rock, pop, indie)
@@ -14,7 +14,6 @@ I'd been meaning to index my liked songs in spotify based on different filters a
   - Song Limit (control playlist size)
 - **Live Preview** - See your filtered playlist before creating
 - **Spotify Integration** - Add generated playlists directly to your Spotify account
-- **Beautiful UI** - Modern, responsive design with Tailwind CSS
 
 ## Tech Stack
 
@@ -67,7 +66,7 @@ I'd been meaning to index my liked songs in spotify based on different filters a
 1. **Login** - Click "Login with Spotify" and authorize the app
 2. **Wait for Loading** - The app will fetch all your liked songs
 3. **Set Filters** - Choose your desired filters:
-   - Enter mood keywords (e.g., "chill", "upbeat")
+   - Enter mood keywords
    - Select genre or artist names
    - Pick specific months or seasons
    - Set date ranges for when songs were added
@@ -108,7 +107,3 @@ playify/
 - **Smart Recommendations** - AI-powered playlist suggestions
 - **Advanced Filters** - Decade, popularity, explicit content filters
 - **Preview songs and lyrics**
-
-## Enjoy Your Custom Playlists!
-
-Start creating amazing playlists tailored to your exact mood and preferences!
