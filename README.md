@@ -74,7 +74,7 @@ I'd been meaning to index my liked songs in spotify based on different filters a
 4. **Generate Preview** - Click "Generate Preview" to see filtered results
 5. **Create Playlist** - Enter a playlist name and click "Add to Spotify"
 
-## 🔧 Development
+## Development
 
 ### Available Scripts
 
